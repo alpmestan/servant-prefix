@@ -1,6 +1,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE FlexibleContexts #-}
 import Data.Reflection
 import GHC.TypeLits
 import Network.Wai.Handler.Warp
@@ -19,6 +20,23 @@ prefixing :: String
           -> r
 prefixing s api f = reifySymbol s $ \sProxy -> f (prefix sProxy api)
 
+serveUnder :: HasServer api '[]
+           => String
+           -> Proxy api
+           -> Server api
+           -> Application
+serveUnder prefix api server = prefixing prefix api $ \apiProxy ->
+  serve apiProxy server
+
+serveUnderWithContext :: HasServer api ctx
+                      => String
+                      -> Proxy api
+                      -> Context ctx
+                      -> Server api
+                      -> Application
+serveUnderWithContext prefix api ctx server =
+  prefixing prefix api $ \apiProxy -> serveWithContext apiProxy ctx server
+
 -- Example
 type API = "foo" :> Get '[JSON] Int
 
@@ -29,4 +47,4 @@ server :: Server API
 server = return 10
 
 main :: IO ()
-main = prefixing "testing" api $ \apiProxy -> run 8080 (serve apiProxy server)
+main = run 8080 (serveUnder "testing" api server)
